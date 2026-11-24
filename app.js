@@ -8,9 +8,10 @@
   var vista = (params.get("vista") || "").toLowerCase();
   var tienda = C.TIENDAS[tiendaId];
   var DEMO = !C.API_URL;
-  var DEMO_KEY = "hito-pbv-demo-v2";
+  var DEMO_KEY = "hito-pbv-demo-v3";
   var TEMA = {}; C.TEMAS.forEach(function (t) { TEMA[t.id] = t; });
   var ROL = {}; C.ROLES.forEach(function (r) { ROL[r.id] = r; });
+  var MOM = {}; C.MOMENTOS.forEach(function (m) { MOM[m.id] = m; });
 
   // ---------- utilidades ----------
   function el(tag, attrs, children) {
@@ -32,34 +33,51 @@
   }
   function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
   function url(q) { var u = new URL(location.href); u.search = q; u.hash = ""; return u.toString(); }
+  function ir(q) { location.search = q; }
   function demoBanner() {
-    return DEMO ? el("div", { class: "demo", text: "Modo demostración: las respuestas se guardan solo en este navegador. Configura API_URL en config.js." }) : null;
+    return DEMO ? el("div", { class: "demo", text: "Modo demostración: las respuestas se guardan solo en este navegador." }) : null;
   }
   function clioFoot(extra) {
     return el("div", { class: "clio" }, [el("img", { src: "clio.png", alt: "CliO Consulting" }), el("span", { text: extra || "CliO para IKEA · Plan Buen Vecino 2026" })]);
   }
   function rolEmoji(r) { return (ROL[r] && ROL[r].emoji) || "✨"; }
+  function qrSvg(texto, node) {
+    try { var q = window.qrcode(0, "M"); q.addData(texto); q.make(); node.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
+    catch (e) { node.textContent = "QR"; }
+    return node;
+  }
+  // Círculo al estilo del sello PBV: color, anillo blanco y emoji al centro.
+  function circulo(color, emoji, num, extraClass) {
+    return el("div", { class: "circ" + (extraClass ? " " + extraClass : ""), style: "background:" + color }, [
+      el("span", { class: "circ-em", text: emoji }),
+      num ? el("span", { class: "circ-n", text: String(num) }) : null
+    ]);
+  }
 
   // ---------- datos ----------
-  function enviar(payload) {
-    if (DEMO) {
-      var all = JSON.parse(localStorage.getItem(DEMO_KEY) || "[]");
-      all.push({
-        id: String(Date.now()) + Math.random().toString(36).slice(2, 6), ts: Date.now(), tienda: payload.tienda,
-        rol: payload.rol, nombre: payload.autorizacion ? payload.nombre : "", experiencia: payload.experiencia || null,
-        logro: payload.logro, mejora: payload.mejora, sueno: payload.sueno
-      });
-      localStorage.setItem(DEMO_KEY, JSON.stringify(all));
-      return Promise.resolve({ ok: true });
-    }
+  function demoAll() { return JSON.parse(localStorage.getItem(DEMO_KEY) || "[]"); }
+  function demoSave(a) { localStorage.setItem(DEMO_KEY, JSON.stringify(a)); }
+  function post(payload) {
     // text/plain evita la verificación previa (CORS) de Apps Script.
     return fetch(C.API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(payload) })
       .then(function (r) { return r.json(); });
   }
+  function enviar(payload) {
+    if (DEMO) {
+      var all = demoAll();
+      all.push({
+        id: String(Date.now()) + Math.random().toString(36).slice(2, 6), ts: Date.now(), tienda: payload.tienda,
+        rol: payload.rol, nombre: payload.autorizacion ? payload.nombre : "", experiencia: payload.experiencia || null,
+        comentario: payload.comentario, logro: payload.logro, mejora: payload.mejora, sueno: payload.sueno, visible: "SI"
+      });
+      demoSave(all);
+      return Promise.resolve({ ok: true });
+    }
+    return post(payload);
+  }
   function traer(t) {
     if (DEMO) {
-      var all = JSON.parse(localStorage.getItem(DEMO_KEY) || "[]");
-      return Promise.resolve(t === "todas" ? all : all.filter(function (r) { return r.tienda === t; }));
+      return Promise.resolve(demoAll().filter(function (r) { return r.visible !== "NO" && (t === "todas" || r.tienda === t); }));
     }
     return fetch(C.API_URL + "?action=data&tienda=" + encodeURIComponent(t) + "&t=" + Date.now())
       .then(function (r) { return r.json(); })
@@ -75,49 +93,27 @@
     return out.sort(function (a, b) { return b.ts - a.ts; });
   }
 
-  // ---------- inicio: elegir tienda ----------
-  function vistaInicio() {
-    var links = Object.keys(C.TIENDAS).map(function (id) {
-      return el("a", { href: "?tienda=" + id }, [C.TIENDAS[id].emoji + " ", C.TIENDAS[id].nombre]);
-    });
-    var org = el("div", { class: "org" }, [el("b", { text: "Para proyectar:" }), el("br")]);
-    Object.keys(C.TIENDAS).forEach(function (id) {
-      org.appendChild(document.createTextNode(C.TIENDAS[id].nombre + ": "));
-      org.appendChild(el("a", { href: "?tienda=" + id + "&vista=instrucciones", text: "instrucciones" }));
-      org.appendChild(document.createTextNode(" · "));
-      org.appendChild(el("a", { href: "?tienda=" + id + "&vista=tendedero", text: "tendedero" }));
-      org.appendChild(document.createTextNode(" · "));
-      org.appendChild(el("a", { href: "?tienda=" + id + "&vista=tablero", text: "tablero" }));
-      org.appendChild(el("br"));
-    });
-    org.appendChild(el("a", { href: "?tienda=todas&vista=tablero", text: "Tablero de las tres tiendas" }));
-
-    app.appendChild(el("div", { class: "phone" }, [
-      demoBanner(),
-      el("div", { class: "p-head" }, [el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "Plan Buen Vecino 2026"]), el("div", { class: "tab", text: "Hitos de cierre" })]),
-      el("div", { class: "p-title" }, [el("div", { class: "eyebrow", text: "Bienvenida 👋" }), el("h1", { text: "Hagamos que siga pasando" })]),
-      el("div", { class: "p-body" }, [el("p", { text: "¿En qué tienda estás hoy?" }), el("div", { class: "tiendas" }, links), org]),
-      el("div", { class: "p-foot" }, [clioFoot()])
-    ]));
-  }
-
-  // ---------- participación desde el celular ----------
+  // =====================================================================
+  //  CELULAR
+  // =====================================================================
   function vistaParticipar() {
-    var s = { paso: 0, tienda: tiendaId, rol: "", nombre: "", anonimo: false, autorizacion: false, experiencia: 0, logro: "", mejora: "", sueno: "" };
+    var s = { paso: 0, volver: false, tienda: tienda ? tiendaId : "", rol: "", nombre: "", anonimo: false, autorizacion: false, experiencia: 0, comentario: "", logro: "", mejora: "", sueno: "" };
     var PASOS = ["inicio", "quien", "experiencia"].concat(C.TEMAS.map(function (t) { return t.id; })).concat(["revisar"]);
+    var REVISAR = PASOS.length - 1;
 
     function shell(tabTxt, eyebrow, titulo, body, actions) {
       clear(app);
       var bar = el("div", { class: "bar", "aria-hidden": "true" });
       for (var i = 1; i < PASOS.length; i++) bar.appendChild(el("span", { class: i <= s.paso ? "on" : "" }));
+      var t = C.TIENDAS[s.tienda];
       app.appendChild(el("div", { class: "phone" }, [
         demoBanner(),
         el("div", { class: "p-head" }, [
-          el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV · " + C.TIENDAS[s.tienda].emoji + " " + C.TIENDAS[s.tienda].nombre]),
+          el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV 2026" + (t && s.paso > 0 ? " · " + t.emoji + " " + t.nombre : "")]),
           el("div", { class: "tab", text: tabTxt })
         ]),
         s.paso > 0 ? bar : null,
-        el("div", { class: "p-title" }, [el("div", { class: "eyebrow", text: eyebrow }), el("h1", { text: titulo })]),
+        el("div", { class: "p-title" }, [eyebrow ? el("div", { class: "eyebrow", text: eyebrow }) : null, el("h1", { text: titulo })]),
         el("div", { class: "p-body" }, body),
         actions ? el("div", { class: "actions" }, actions) : null,
         el("div", { class: "p-foot" }, [clioFoot()])
@@ -127,6 +123,22 @@
     function ir(n) { s.paso = n; render(); }
     function pasoTxt() { return "Paso " + s.paso + " de " + (PASOS.length - 1); }
     function error(n, msg) { n.textContent = msg; n.classList.remove("hidden"); }
+    // Botones de abajo: normales, o «volver a revisar» si se llegó desde «Editar».
+    function botones(atras, siguiente, validar) {
+      if (s.volver) {
+        return [el("button", { class: "btn pri", type: "button", text: "Listo, volver a revisar 👀", onclick: function () {
+          if (validar && !validar()) return;
+          s.volver = false; ir(REVISAR);
+        } })];
+      }
+      return [
+        el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(atras); } }),
+        el("button", { class: "btn pri", type: "button", text: siguiente.txt || "Siguiente 👉", onclick: function () {
+          if (validar && !validar()) return;
+          ir(siguiente.n);
+        } })
+      ];
+    }
 
     function render() {
       var p = PASOS[s.paso];
@@ -138,27 +150,30 @@
     }
 
     function inicio() {
-      var howto = el("div", { class: "howto" }, C.TEMAS.map(function (t) {
-        return el("div", { class: "row", style: "border-left:6px solid " + t.color }, [
-          el("div", { class: "em", text: t.emoji }),
-          el("b", { text: t.num + ". " + t.titulo })
-        ]);
+      var err = el("p", { class: "err hidden" });
+      var tiendas = el("div", { class: "tiendas-c", role: "radiogroup", "aria-label": "Tu tienda" }, Object.keys(C.TIENDAS).map(function (id) {
+        var on = s.tienda === id;
+        return el("button", { type: "button", class: "tienda-c" + (on ? " on" : ""), role: "radio", "aria-checked": String(on), onclick: function () { s.tienda = id; render(); } },
+          [el("span", { class: "em", text: C.TIENDAS[id].emoji }), C.TIENDAS[id].nombre]);
       }));
-      shell("Bienvenida", "Hito de cierre 2026 💙", "Hagamos que siga pasando", [
-        howto,
-        el("div", { class: "badge", text: "⏱️ " + C.TIEMPO_MIN + " minutos · ¡mira el reloj en pantalla!" })
-      ], [el("button", { class: "btn pri", type: "button", text: "Empezar 👉", onclick: function () { ir(1); } })]);
+      var pasos = el("div", { class: "circs" }, C.TEMAS.map(function (t) {
+        return el("div", { class: "circ-item" }, [circulo(t.color, t.emoji, t.num), el("b", { text: t.titulo })]);
+      }));
+      shell("¡Hola! 👋", null, "Hagamos que siga pasando", [
+        el("div", {}, [el("label", { class: "lbl", text: "🏬 ¿En qué tienda estás?" }), tiendas]),
+        el("div", {}, [el("label", { class: "lbl", text: "✍️ Vamos a responder 3 cosas" }), pasos]),
+        err
+      ], [el("button", { class: "btn pri", type: "button", text: "Empezar 👉", onclick: function () {
+        if (!s.tienda) return error(err, "👆 Elige tu tienda para empezar.");
+        ir(1);
+      } })]);
     }
 
     function quien() {
       var err = el("p", { class: "err hidden" });
       var chips = el("div", { class: "chips", role: "radiogroup", "aria-label": "¿Cómo participaste?" }, C.ROLES.map(function (r) {
-        return el("button", { type: "button", class: "chip" + (s.rol === r.id ? " on" : ""), role: "radio", "aria-checked": String(s.rol === r.id), onclick: function () { s.rol = r.id; render(); } },
+        return el("button", { type: "button", class: "chip" + (s.rol === r.id ? " on" : ""), role: "radio", "aria-checked": String(s.rol === r.id), onclick: function () { sync(); s.rol = r.id; render(); } },
           [el("span", { class: "em", text: r.emoji }), r.id]);
-      }));
-      var tiendas = el("div", { class: "chips three", role: "radiogroup", "aria-label": "Tu tienda" }, Object.keys(C.TIENDAS).map(function (id) {
-        return el("button", { type: "button", class: "chip" + (s.tienda === id ? " on" : ""), role: "radio", "aria-checked": String(s.tienda === id), onclick: function () { s.tienda = id; render(); } },
-          [el("span", { class: "em", text: C.TIENDAS[id].emoji }), C.TIENDAS[id].nombre]);
       }));
       var nombre = el("input", { type: "text", id: "nombre", maxlength: "60", autocomplete: "name", placeholder: "Escribe tu nombre (opcional)" });
       nombre.value = s.nombre;
@@ -173,34 +188,31 @@
       nombre.addEventListener("input", sync); anon.addEventListener("change", sync); aut.addEventListener("change", sync);
       sync();
       shell(pasoTxt(), "Paso 1 · ¿Quién eres?", "Cuéntanos de ti 👋", [
-        el("label", { class: "lbl", text: "🏬 Tu tienda" }), tiendas,
-        el("label", { class: "lbl", text: "🙋 ¿Cómo participaste?" }), chips,
+        el("div", {}, [el("label", { class: "lbl", text: "🙋 ¿Cómo participaste?" }), chips]),
         el("div", {}, [el("label", { class: "lbl", for: "nombre", text: "✍️ Tu nombre" }), nombre]),
         el("label", { class: "check", for: "anon" }, [anon, el("span", { text: "🙈 Prefiero participar de forma anónima" })]),
         autBox,
         err
-      ], [
-        el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(0); } }),
-        el("button", { class: "btn pri", type: "button", text: "Siguiente 👉", onclick: function () {
-          sync();
-          if (!s.rol) return error(err, "👆 Elige cómo participaste.");
-          if (s.nombre && !s.anonimo && !s.autorizacion) return error(err, "Autoriza tu nombre o marca 🙈 anónimo.");
-          ir(2);
-        } })
-      ]);
+      ], botones(0, { n: 2 }, function () {
+        sync();
+        if (!s.rol) { error(err, "👆 Elige cómo participaste."); return false; }
+        if (s.nombre && !s.anonimo && !s.autorizacion) { error(err, "Autoriza tu nombre o marca 🙈 anónimo."); return false; }
+        return true;
+      }));
     }
 
     function experiencia() {
+      var com = el("textarea", { id: "com", class: "corto", maxlength: String(C.MAX_CHARS), placeholder: "Escribe aquí (opcional)" });
+      com.value = s.comentario;
+      com.addEventListener("input", function () { s.comentario = com.value; });
       var scale = el("div", { class: "scale", role: "radiogroup", "aria-label": "Tu experiencia en 2026" }, C.EXPERIENCIA.map(function (e) {
         return el("button", { type: "button", class: s.experiencia === e.v ? "on" : "", role: "radio", "aria-checked": String(s.experiencia === e.v), "aria-label": e.txt, onclick: function () { s.experiencia = e.v; render(); } },
           [el("span", { class: "em", text: e.emoji }), el("small", { text: e.txt })]);
       }));
       shell(pasoTxt(), "Paso 2 · Calentemos motores 🔥", "¿Cómo te fue en el PBV 2026?", [
-        scale
-      ], [
-        el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(1); } }),
-        el("button", { class: "btn pri", type: "button", text: s.experiencia ? "Siguiente 👉" : "Saltar", onclick: function () { ir(3); } })
-      ]);
+        scale,
+        el("div", {}, [el("label", { class: "lbl", for: "com", text: "💬 ¿Algo más que quieras contarnos?" }), com])
+      ], botones(1, { n: 3, txt: s.experiencia || s.comentario ? "Siguiente 👉" : "Saltar 👉" }));
     }
 
     function tema(t) {
@@ -209,36 +221,42 @@
       var count = el("div", { class: "count" });
       function upd() { s[t.id] = ta.value; count.textContent = ta.value.length + " / " + C.MAX_CHARS; }
       ta.addEventListener("input", upd); upd();
-      var ej = el("div", { class: "ejemplos" }, t.ejemplos.map(function (x) {
-        return el("button", { type: "button", text: "💡 " + x, onclick: function () { ta.value = x; upd(); ta.focus(); } });
-      }));
+      var ej = el("div", { class: "ideas" }, [
+        el("div", { class: "ideas-t", text: "💡 ¿Sin ideas? Inspírate con una (tócala y ajústala)" }),
+        el("div", { class: "ejemplos" }, t.ejemplos.map(function (x) {
+          return el("button", { type: "button", text: x, onclick: function () { ta.value = x; upd(); ta.focus(); } });
+        }))
+      ]);
       shell(pasoTxt(), t.emoji + " " + t.titulo, t.pregunta, [
         el("div", { class: "tema-line", style: "background:" + t.color }),
         el("div", {}, [ta, count]),
         ej
-      ], [
-        el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(s.paso - 1); } }),
-        el("button", { class: "btn pri", type: "button", text: "Siguiente 👉", onclick: function () { ir(s.paso + 1); } })
-      ]);
+      ], botones(s.paso - 1, { n: s.paso + 1 }));
     }
 
     function revisar() {
       var err = el("p", { class: "err hidden" });
+      function editar(n) { return el("button", { type: "button", class: "edit", text: "✏️ Editar", onclick: function () { s.volver = true; ir(n); } }); }
       var exp = C.EXPERIENCIA.filter(function (e) { return e.v === s.experiencia; })[0];
-      var prev = el("div", { class: "preview" }, C.TEMAS.map(function (t) {
+      var quienTxt = (s.nombre && !s.anonimo && s.autorizacion ? s.nombre : "🙈 Anónimo") + " · " + rolEmoji(s.rol) + " " + s.rol;
+      var filas = [
+        el("div", { class: "rev-row" }, [el("span", { text: quienTxt }), editar(1)]),
+        el("div", { class: "rev-row" }, [el("span", { text: exp ? exp.emoji + " " + exp.txt + (s.comentario.trim() ? " · 💬 " + s.comentario.trim() : "") : (s.comentario.trim() ? "💬 " + s.comentario.trim() : "Sin calificación") }), editar(2)])
+      ];
+      var prev = el("div", { class: "preview" }, C.TEMAS.map(function (t, i) {
         var txt = s[t.id].trim();
+        var head = el("div", { class: "mini-h" }, [el("b", { text: t.emoji + " " + t.titulo }), editar(3 + i)]);
         return txt
-          ? el("div", { class: "mini", style: "background:" + t.color + ";color:" + t.texto }, [el("b", { text: t.emoji + " " + t.titulo }), txt])
-          : el("div", { class: "mini vacia" }, [el("b", { text: t.emoji + " " + t.titulo }), "Sin respuesta"]);
+          ? el("div", { class: "mini", style: "background:" + t.color + ";color:" + t.texto }, [head, txt])
+          : el("div", { class: "mini vacia" }, [head, "Sin respuesta"]);
       }));
-      var quienTxt = (s.nombre && !s.anonimo && s.autorizacion ? s.nombre + " · " : "🙈 Anónimo · ") + rolEmoji(s.rol) + " " + s.rol;
       var back = el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(s.paso - 1); } });
       var send = el("button", { class: "btn pri", type: "button", text: "Colgar en el tendedero 🚀", onclick: function () {
         var alguna = C.TEMAS.some(function (t) { return s[t.id].trim(); });
         if (!alguna) return error(err, "✍️ Escribe al menos una respuesta antes de enviar.");
         send.disabled = true; back.disabled = true; send.textContent = "Enviando…";
         var conNombre = !s.anonimo && !!s.nombre && s.autorizacion;
-        var payload = { tienda: s.tienda, rol: s.rol, nombre: conNombre ? s.nombre : "", anonimo: !conNombre, autorizacion: conNombre, experiencia: s.experiencia || null };
+        var payload = { tienda: s.tienda, rol: s.rol, nombre: conNombre ? s.nombre : "", anonimo: !conNombre, autorizacion: conNombre, experiencia: s.experiencia || null, comentario: s.comentario.trim() };
         C.TEMAS.forEach(function (t) { payload[t.id] = s[t.id].trim(); });
         enviar(payload).then(function (r) {
           if (!r || !r.ok) throw new Error((r && r.error) || "error");
@@ -249,15 +267,16 @@
         });
       } });
       shell(pasoTxt(), "Último paso 👀", "Así se verán tus tarjetas", [
-        el("p", { class: "hint", text: quienTxt + (exp ? " · Experiencia " + exp.emoji : "") }),
+        el("div", { class: "rev" }, filas),
         prev, err
       ], [back, send]);
     }
 
     function gracias() {
       clear(app);
+      var t = C.TIENDAS[s.tienda];
       app.appendChild(el("div", { class: "phone" }, [
-        el("div", { class: "p-head" }, [el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV · " + C.TIENDAS[s.tienda].emoji + " " + C.TIENDAS[s.tienda].nombre]), el("div", { class: "tab", text: "¡Listo!" })]),
+        el("div", { class: "p-head" }, [el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV 2026 · " + t.emoji + " " + t.nombre]), el("div", { class: "tab", text: "¡Listo!" })]),
         el("div", { class: "p-body thanks" }, [
           el("div", { class: "em", text: "🎉" }),
           el("div", { class: "big", text: "¡Gracias! Tus tarjetas ya están en el tendedero." }),
@@ -271,16 +290,54 @@
     render();
   }
 
-  // ---------- marco de pantallas grandes ----------
-  function pantalla(tabTxt, sub, contenido, conQR, extraTools, extraHead) {
+  // =====================================================================
+  //  RELATOR (proyector)
+  // =====================================================================
+
+  // Portada del relator: se elige la ciudad una sola vez.
+  function vistaRelatorInicio() {
+    app.appendChild(el("div", { class: "big-screen" }, [
+      demoBanner(),
+      el("header", { class: "s-head" }, [
+        el("div", {}, [
+          el("div", { class: "eyebrow" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "Plan Buen Vecino 2026 · Hito de cierre"]),
+          el("h1", { text: "Hagamos que siga pasando" })
+        ]),
+        el("div", { class: "right" }, [el("div", { class: "tab", text: "🎤 Relator" })])
+      ]),
+      el("div", { class: "r-home" }, [
+        el("h2", { text: "¿En qué tienda estamos hoy?" }),
+        el("div", { class: "r-ciudades" }, Object.keys(C.TIENDAS).map(function (id) {
+          return el("a", { class: "r-ciudad", href: "?tienda=" + id + "&vista=instrucciones" }, [
+            circulo("#0058A3", C.TIENDAS[id].emoji, null, "xl"), el("b", { text: C.TIENDAS[id].nombre })
+          ]);
+        })),
+        el("p", { class: "r-otros" }, [
+          el("a", { href: "?tienda=todas&vista=resumen", text: "✨ Resumen de las tres tiendas" }), " · ",
+          el("a", { href: "?vista=moderar", text: "🛡️ Moderar respuestas (en otro computador)" })
+        ])
+      ]),
+      el("footer", { class: "s-foot" }, [clioFoot(), el("div", { class: "tools" }, [])])
+    ]));
+  }
+
+  // Marco de las pantallas del relator, con pestañas 1-2-3 siempre visibles.
+  function pantalla(activa, contenido, opts) {
+    opts = opts || {};
     var qr = null;
-    if (conQR && tienda) {
-      var code = el("div", { class: "code", "aria-label": "Código QR para participar" });
-      try { var q = window.qrcode(0, "M"); q.addData(url("?tienda=" + tiendaId)); q.make(); code.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
-      catch (e) { code.textContent = "QR"; }
-      qr = el("div", { class: "qr" }, [code, el("div", { class: "txt" }, ["📱 Escanea y participa", el("small", { text: url("?tienda=" + tiendaId).replace(/^https?:\/\//, "") })])]);
+    if (opts.qr && tienda) {
+      qr = el("div", { class: "qr" }, [qrSvg(url("?tienda=" + tiendaId), el("div", { class: "code", "aria-label": "Código QR para participar" })), el("div", { class: "txt", text: "📱 Escanea y participa" })]);
     }
-    var estado = el("span", { text: "Conectando…" });
+    var nav = null;
+    if (tienda) {
+      nav = el("nav", { class: "r-nav", "aria-label": "Pantallas del relator" }, [
+        ["instrucciones", "1", "📋 Instrucciones"], ["tendedero", "2", "🧺 Tendedero"], ["resumen", "3", "✨ Resumen"]
+      ].map(function (o) {
+        return el("button", { type: "button", class: o[0] === activa ? "on" : "", "aria-current": o[0] === activa ? "page" : null, onclick: function () { ir("?tienda=" + tiendaId + "&vista=" + o[0]); } },
+          [el("span", { class: "n", text: o[1] }), o[2]]);
+      }));
+    }
+    var estado = el("span", { class: "estado", text: "" });
     var full = el("button", { type: "button", text: "⛶ Pantalla completa", onclick: function () {
       if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen();
     } });
@@ -290,66 +347,117 @@
       el("header", { class: "s-head" }, [
         el("div", {}, [
           el("div", { class: "eyebrow" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "Plan Buen Vecino 2026 · " + nombreT]),
-          el("h1", { text: "Hagamos que siga pasando" }),
-          sub ? el("div", { class: "sub", text: sub }) : null
+          el("h1", { text: "Hagamos que siga pasando" })
         ]),
-        el("div", { class: "right" }, [el("div", { class: "tab", text: tabTxt }), el("div", { class: "headrow" }, [extraHead || null, qr])])
+        el("div", { class: "right" }, [nav || el("div", { class: "tab", text: "✨ Resumen" }), el("div", { class: "headrow" }, [opts.head || null, qr])])
       ]),
       contenido,
-      el("footer", { class: "s-foot" }, [clioFoot(), el("div", { class: "tools" }, (extraTools || []).concat([estado, full]))])
+      el("footer", { class: "s-foot" }, [clioFoot(), el("div", { class: "tools" }, [
+        estado,
+        el("button", { type: "button", text: "🏬 Cambiar de tienda", onclick: function () { ir("?vista=relator"); } }),
+        full
+      ])])
     ]));
     return estado;
   }
   function bucle(fn, estado) {
     function ciclo() {
       fn().then(function () {
-        estado.textContent = "🟢 En vivo · " + new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
-      }).catch(function () { estado.textContent = "🟠 Sin conexión con la hoja, reintentando…"; })
+        estado.textContent = "🟢 En vivo";
+      }).catch(function () { estado.textContent = "🟠 Reconectando…"; })
         .then(function () { setTimeout(ciclo, C.REFRESH_MS); });
     }
     ciclo();
   }
 
-  // ---------- reloj de cuenta regresiva (proyector) ----------
-  var RELOJ_KEY = "hito-pbv-reloj";
+  // ---------- reloj por momento ----------
+  var RELOJ_KEY = "hito-pbv-reloj-v2";
+  function relojNuevo(id) { return { momento: id, restante: MOM[id].min * 60000, fin: null }; }
   function relojEstado() {
-    try { var r = JSON.parse(localStorage.getItem(RELOJ_KEY)); if (r && typeof r.restante === "number") return r; } catch (e) {}
-    return { restante: C.TIEMPO_MIN * 60000, fin: null };
+    try { var r = JSON.parse(localStorage.getItem(RELOJ_KEY)); if (r && MOM[r.momento] && typeof r.restante === "number") return r; } catch (e) {}
+    return relojNuevo(C.MOMENTOS[0].id);
   }
   function relojGuardar(r) { try { localStorage.setItem(RELOJ_KEY, JSON.stringify(r)); } catch (e) {} }
-  function reloj(grande) {
-    var r = relojEstado();
-    var cifra = el("div", { class: "rl-cifra" });
-    var play = el("button", { type: "button" });
+  function reloj(grande, alCambiar) {
+    var r = relojEstado(), ultimo = null, editando = false;
+    var cifra = el("button", { type: "button", class: "rl-cifra", title: "Toca para cambiar el tiempo" });
+    var editor = el("input", { type: "text", class: "rl-edit hidden", inputmode: "numeric", "aria-label": "Tiempo (minutos o mm:ss)" });
+    var etiqueta = el("div", { class: "rl-mom" });
+    var play = el("button", { type: "button", class: "rl-play" });
+    var expandir = el("button", { type: "button", class: "rl-exp", title: "Reloj en pantalla completa", text: "⛶" });
+    var momentos = el("div", { class: "rl-moms", role: "radiogroup", "aria-label": "Momento" }, C.MOMENTOS.map(function (m) {
+      return el("button", { type: "button", "data-m": m.id, title: m.titulo + " · " + m.min + " min", onclick: function () { r = relojNuevo(m.id); relojGuardar(r); pintar(); } }, [m.emoji]);
+    }));
+    function sumar(ms) {
+      if (r.fin) r.fin = Math.max(Date.now(), r.fin + ms); else r.restante = Math.max(0, r.restante + ms);
+      relojGuardar(r); pintar();
+    }
     var box = el("div", { class: "reloj" + (grande ? " grande" : "") }, [
-      el("div", { class: "rl-top" }, [el("span", { text: "⏱️" }), cifra]),
+      expandir, momentos, etiqueta,
+      el("div", { class: "rl-top" }, [cifra, editor]),
       el("div", { class: "rl-btns" }, [
         play,
-        el("button", { type: "button", text: "+1 min", onclick: function () { if (r.fin) r.fin += 60000; else r.restante += 60000; relojGuardar(r); pintar(); } }),
-        el("button", { type: "button", text: "↺", "aria-label": "Reiniciar", onclick: function () { r = { restante: C.TIEMPO_MIN * 60000, fin: null }; relojGuardar(r); pintar(); } })
-      ])
+        el("button", { type: "button", class: "rl-mas", text: "−1", title: "Quitar 1 minuto", onclick: function () { sumar(-60000); } }),
+        el("button", { type: "button", class: "rl-mas", text: "+1", title: "Sumar 1 minuto", onclick: function () { sumar(60000); } }),
+        el("button", { type: "button", text: "↺", "aria-label": "Reiniciar", onclick: function () { r = relojNuevo(r.momento); relojGuardar(r); pintar(); } })
+      ]),
+      el("button", { type: "button", class: "rl-cerrar", text: "✕ Volver", onclick: function () { cerrar(); } })
     ]);
+    function abrir() {
+      box.classList.add("expandido");
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(function () {});
+    }
+    function cerrar() { box.classList.remove("expandido"); }
+    expandir.addEventListener("click", function () { if (box.classList.contains("expandido")) cerrar(); else abrir(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !editando) cerrar(); });
+    // Editar el tiempo: escribir "3" (minutos) o "2:30".
+    cifra.addEventListener("click", function () {
+      editando = true;
+      var ms = r.fin ? Math.max(0, r.fin - Date.now()) : r.restante, seg = Math.ceil(ms / 1000);
+      editor.value = Math.floor(seg / 60) + ":" + String(seg % 60).padStart(2, "0");
+      cifra.classList.add("hidden"); editor.classList.remove("hidden"); editor.focus(); editor.select();
+    });
+    function aplicar() {
+      if (!editando) return;
+      editando = false;
+      var v = editor.value.trim().replace(",", ":").replace(".", ":"), p = v.split(":"), ms = NaN;
+      if (p.length === 1) ms = parseFloat(p[0]) * 60000;
+      else if (p.length === 2) ms = (parseInt(p[0] || "0", 10) * 60 + parseInt(p[1] || "0", 10)) * 1000;
+      if (isFinite(ms) && ms >= 0 && ms <= 120 * 60000) {
+        if (r.fin) r.fin = Date.now() + ms; else r.restante = ms;
+        relojGuardar(r);
+      }
+      editor.classList.add("hidden"); cifra.classList.remove("hidden"); pintar();
+    }
+    editor.addEventListener("keydown", function (e) { if (e.key === "Enter") aplicar(); if (e.key === "Escape") { editando = false; editor.classList.add("hidden"); cifra.classList.remove("hidden"); } });
+    editor.addEventListener("blur", aplicar);
     play.addEventListener("click", function () {
       if (r.fin) { r.restante = Math.max(0, r.fin - Date.now()); r.fin = null; }
-      else { if (r.restante <= 0) r.restante = C.TIEMPO_MIN * 60000; r.fin = Date.now() + r.restante; }
+      else { if (r.restante <= 0) r.restante = MOM[r.momento].min * 60000; r.fin = Date.now() + r.restante; }
       relojGuardar(r); pintar();
     });
     function pintar() {
       var ms = r.fin ? Math.max(0, r.fin - Date.now()) : r.restante;
       var seg = Math.ceil(ms / 1000);
+      var m = MOM[r.momento];
+      etiqueta.textContent = m.emoji + " " + m.titulo;
       cifra.textContent = ms <= 0 ? "¡Tiempo! ⏰" : String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0");
+      Array.prototype.forEach.call(momentos.children, function (b) {
+        var on = b.getAttribute("data-m") === r.momento;
+        b.classList.toggle("on", on); b.setAttribute("aria-checked", String(on));
+      });
       box.classList.toggle("corre", !!r.fin && ms > 0);
       box.classList.toggle("urgente", !!r.fin && ms > 0 && ms <= 30000);
       box.classList.toggle("fin", ms <= 0);
       play.textContent = r.fin && ms > 0 ? "⏸ Pausar" : "▶ Iniciar";
-      if (r.fin && ms <= 0) { r = { restante: 0, fin: null }; relojGuardar(r); }
+      if (r.fin && ms <= 0) { r = { momento: r.momento, restante: 0, fin: null }; relojGuardar(r); }
+      if (alCambiar && ultimo !== r.momento) { ultimo = r.momento; alCambiar(m); }
     }
     pintar();
     setInterval(pintar, 250);
     return box;
   }
 
-  // ---------- aviso de tarjeta nueva (proyector) ----------
   function aviso(texto) {
     var t = el("div", { class: "toast", text: texto });
     document.body.appendChild(t);
@@ -357,55 +465,48 @@
     setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 3800);
   }
 
-  // ---------- instrucciones (proyector, antes de los resultados) ----------
+  // ---------- 1 · instrucciones ----------
   function vistaInstrucciones() {
-    var link = url("?tienda=" + tiendaId);
-    var code = el("div", { class: "bigqr", "aria-label": "Código QR para participar" });
-    try { var q = window.qrcode(0, "M"); q.addData(link); q.make(); code.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
-    catch (e) { code.textContent = "QR"; }
     var pasos = [
       ["📱", "Escanea el QR"],
-      ["🙋", "Elige tu tienda y tu rol"],
-      ["😊", "Califica tu 2026"],
-      ["🏆🔧🌱", "Responde 3 preguntas"],
+      ["✍️", "Responde 3 preguntas"],
       ["🧺", "¡Cuelga tus tarjetas!"]
     ];
     var lista = el("div", { class: "ins-steps" }, pasos.map(function (p, i) {
-      return el("div", { class: "ins-step" }, [
-        el("div", { class: "ins-n", text: String(i + 1) }),
-        el("div", { class: "ins-em", text: p[0] }),
-        el("b", { text: p[1] })
-      ]);
+      return el("div", { class: "ins-step" }, [el("div", { class: "ins-n", text: String(i + 1) }), el("div", { class: "ins-em", text: p[0] }), el("b", { text: p[1] })]);
     }));
-    var temas = el("div", { class: "ins-temas" }, C.TEMAS.map(function (t) {
-      return el("div", { class: "ins-tema", style: "background:" + t.color + ";color:" + t.texto }, [el("span", { text: t.emoji }), t.titulo]);
+    var temas = el("div", { class: "ins-circs" }, C.TEMAS.map(function (t) {
+      return el("div", { class: "circ-item" }, [circulo(t.color, t.emoji, t.num, "lg"), el("b", { text: t.titulo })]);
     }));
     var contenido = el("div", { class: "ins" }, [
       el("div", { class: "ins-left" }, [lista, temas]),
-      el("div", { class: "ins-right" }, [code, reloj(true)])
+      el("div", { class: "ins-right" }, [qrSvg(url("?tienda=" + tiendaId), el("div", { class: "bigqr", "aria-label": "Código QR para participar" })), reloj(true)])
     ]);
-    var ir = el("button", { type: "button", text: "🧺 Ver tendedero 👉", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=tendedero"; } });
-    var estado = pantalla("📋 ¿Cómo participar?", "", contenido, false, [ir]);
-    estado.textContent = "";
+    pantalla("instrucciones", contenido);
   }
 
-  // ---------- tendedero ----------
+  // ---------- 2 · tendedero ----------
   function vistaTendedero() {
     var vistos = {}, primera = true, cols = {};
     var lines = el("div", { class: "lines" });
     C.TEMAS.forEach(function (t) {
-      var k = el("span", { class: "k", text: "0" });
+      var k = el("span", { class: "circ-n", text: "0" });
       var cards = el("div", { class: "cards" });
-      cols[t.id] = { k: k, cards: cards };
-      lines.appendChild(el("section", { class: "col", "aria-label": t.titulo }, [
-        el("div", { class: "col-head" }, [el("span", { class: "em", text: t.emoji }), el("h2", { text: t.num + ". " + t.titulo }), k]),
+      var sec = el("section", { class: "col", "aria-label": t.titulo }, [
+        el("div", { class: "col-head" }, [el("div", { class: "circ sm", style: "background:" + t.color }, [el("span", { class: "circ-em", text: t.emoji }), k]), el("h2", { text: t.titulo })]),
         el("div", { class: "rope", style: "background:" + t.color }),
         cards
-      ]));
+      ]);
+      cols[t.id] = { k: k, cards: cards, sec: sec };
+      lines.appendChild(sec);
     });
-    var instr = el("button", { type: "button", text: "📋 Instrucciones", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=instrucciones"; } });
-    var tablero = el("button", { type: "button", text: "📊 Ver tablero", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=tablero"; } });
-    var estado = pantalla("🧺 Tendedero en vivo", "", lines, true, [instr, tablero], reloj(false));
+    function destacar(m) {
+      C.TEMAS.forEach(function (t) {
+        cols[t.id].sec.classList.toggle("activa", m.tema === t.id);
+        cols[t.id].sec.classList.toggle("tenue", !!m.tema && m.tema !== t.id);
+      });
+    }
+    var estado = pantalla("tendedero", lines, { qr: true, head: reloj(false, destacar) });
 
     bucle(function () {
       return traer(tiendaId).then(function (resp) {
@@ -413,7 +514,7 @@
         C.TEMAS.forEach(function (t) {
           var lista = tarjetas.filter(function (c) { return c.tema === t.id; });
           var box = cols[t.id];
-          box.k.textContent = lista.length + " 🗂️";
+          box.k.textContent = String(lista.length);
           clear(box.cards);
           if (!lista.length) { box.cards.appendChild(el("p", { class: "empty", text: "📱 ¡Cuelga la primera!" })); return; }
           lista.slice(0, C.MAX_TARJETAS_POR_TEMA).forEach(function (c) {
@@ -434,8 +535,8 @@
     }, estado);
   }
 
-  // ---------- tablero ----------
-  var STOP = ("a al algo algun alguna algunas alguno algunos ante antes aqui asi aun cada como con contra cual cuales cuando de del desde donde dos el ella ellas ellos en entre era eramos es esa esas ese eso esos esta estaba estamos estan estar estas este esto estos fue fueron gran ha hace hacer hacia han hasta hay la las le les lo los mas me mi mis mucho muchos muy nada ni no nos nosotros nuestra nuestras nuestro nuestros o otra otras otro otros para pero poco por porque que quien se ser si sin sobre son su sus tambien tan te tener tenemos ti tiene todo todos tu tus un una unas uno unos y ya yo año años 2026 2027 cosas cosa poder puede pueden hacer ser sea").split(" ");
+  // ---------- 3 · resumen ----------
+  var STOP = ("a al algo algun alguna algunas alguno algunos ante antes aqui asi aun cada como con contra cual cuales cuando de del desde donde dos el ella ellas ellos en entre era eramos es esa esas ese eso esos esta estaba estamos estan estar estas este esto estos fue fueron gran ha hace hacer hacia han hasta hay la las le les lo los mas me mi mis mucho muchos muy nada ni no nos nosotros nuestra nuestras nuestro nuestros o otra otras otro otros para pero poco por porque que quien se ser si sin sobre son su sus tambien tan te tener tenemos ti tiene todo todos tu tus un una unas uno unos y ya yo año años 2026 2027 cosas cosa poder puede pueden sea").split(" ");
   function sinTilde(w) { return w.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
   function palabras(textos, n) {
     var cuenta = {}, forma = {};
@@ -449,93 +550,146 @@
     });
     return Object.keys(cuenta).sort(function (a, b) { return cuenta[b] - cuenta[a]; }).slice(0, n).map(function (k) { return { w: forma[k], n: cuenta[k] }; });
   }
-  function hbar(label, n, max, color) {
-    var pct = max ? Math.round(n / max * 100) : 0;
-    return el("div", { class: "hbar" }, [el("span", { text: label }), el("div", { class: "track" }, [el("div", { class: "fill", style: "width:" + pct + "%;background:" + (color || "#0058A3") })]), el("span", { class: "n", text: String(n) })]);
-  }
 
-  function vistaTablero() {
+  function vistaResumen() {
     var actual = tienda ? tiendaId : "todas";
-    var dash = el("div", { class: "dash" });
-    var selector = el("div", { class: "tiendasel" });
-    [["todas", "🇨🇴 Todas"]].concat(Object.keys(C.TIENDAS).map(function (id) { return [id, C.TIENDAS[id].emoji + " " + C.TIENDAS[id].nombre]; })).forEach(function (o) {
-      selector.appendChild(el("button", { type: "button", class: o[0] === actual ? "on" : "", text: o[1], onclick: function () {
-        location.search = o[0] === "todas" ? "?tienda=todas&vista=tablero" : "?tienda=" + o[0] + "&vista=tablero";
-      } }));
-    });
-    var tools = [selector];
-    if (tienda) tools.push(el("button", { type: "button", text: "🧺 Ver tendedero", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=tendedero"; } }));
-    var estado = pantalla("📊 Tablero en vivo", "", dash, !!tienda, tools);
-
-    bucle(function () {
-      return traer(actual).then(function (resp) { pintar(resp); });
-    }, estado);
+    var box = el("div", { class: "res" });
+    var estado = pantalla("resumen", box, { qr: !!tienda });
+    bucle(function () { return traer(actual).then(pintar); }, estado);
 
     function pintar(resp) {
-      clear(dash);
+      clear(box);
       var tarjetas = aTarjetas(resp);
-      var conExp = resp.filter(function (r) { return r.experiencia; });
-      var prom = conExp.length ? conExp.reduce(function (a, r) { return a + r.experiencia; }, 0) / conExp.length : 0;
-      var promEmoji = prom ? C.EXPERIENCIA[Math.min(4, Math.max(0, Math.round(prom) - 1))].emoji : "—";
-      var anon = resp.filter(function (r) { return !r.nombre; }).length;
+      if (!resp.length) { box.appendChild(el("div", { class: "res-vacio" }, [el("div", { class: "em", text: "📱" }), el("p", { text: "Aún no hay respuestas. ¡Escanea el QR para empezar!" })])); return; }
 
-      dash.appendChild(el("div", { class: "kpis" }, [
-        el("div", { class: "kpi" }, [el("div", { class: "em", text: "👥" }), el("div", { class: "v", text: String(resp.length) }), el("div", { class: "l", text: "personas participaron" })]),
-        el("div", { class: "kpi" }, [el("div", { class: "em", text: "🗂️" }), el("div", { class: "v", text: String(tarjetas.length) }), el("div", { class: "l", text: "tarjetas en el tendedero" })]),
-        el("div", { class: "kpi y" }, [el("div", { class: "em", text: promEmoji }), el("div", { class: "v", text: prom ? prom.toFixed(1).replace(".", ",") + " / 5" : "—" }), el("div", { class: "l", text: "experiencia 2026 (promedio)" })]),
-        el("div", { class: "kpi y" }, [el("div", { class: "em", text: "🙈" }), el("div", { class: "v", text: resp.length ? Math.round(anon / resp.length * 100) + " %" : "—" }), el("div", { class: "l", text: "participó de forma anónima" })])
+      // fila 1: personas, tarjetas y cómo nos fue
+      var conExp = resp.filter(function (r) { return r.experiencia; });
+      var caras = el("div", { class: "res-caras" }, C.EXPERIENCIA.slice().reverse().map(function (e) {
+        var n = conExp.filter(function (r) { return r.experiencia === e.v; }).length;
+        return el("div", { class: "res-cara" + (n ? "" : " cero") }, [el("span", { class: "em", text: e.emoji }), el("span", { class: "n", text: String(n) })]);
+      }));
+      box.appendChild(el("div", { class: "res-top" }, [
+        el("div", { class: "res-stat" }, [el("div", { class: "v", text: String(resp.length) }), el("div", { class: "l", text: "👥 personas" })]),
+        el("div", { class: "res-stat" }, [el("div", { class: "v", text: String(tarjetas.length) }), el("div", { class: "l", text: "🗂️ tarjetas" })]),
+        el("div", { class: "res-block" }, [el("h3", { text: "😊 ¿Cómo nos fue?" }), caras])
       ]));
 
-      if (!resp.length) { dash.appendChild(el("p", { class: "nodata", text: "📱 Aún no hay respuestas. Escanea el QR para empezar." })); return; }
-
-      var pExp = el("div", { class: "panel" }, [el("h3", { text: "😊 ¿Cómo fue el 2026?" })]);
-      var maxE = 0, cE = {};
-      C.EXPERIENCIA.forEach(function (e) { cE[e.v] = conExp.filter(function (r) { return r.experiencia === e.v; }).length; maxE = Math.max(maxE, cE[e.v]); });
-      C.EXPERIENCIA.slice().reverse().forEach(function (e) { pExp.appendChild(hbar(e.emoji + " " + e.txt, cE[e.v], maxE, "#FFDB00")); });
-
-      var pRol = el("div", { class: "panel" }, [el("h3", { text: "🙋 ¿Quiénes participaron?" })]);
-      var cR = {}, maxR = 0;
-      resp.forEach(function (r) { cR[r.rol] = (cR[r.rol] || 0) + 1; });
-      Object.keys(cR).forEach(function (k) { maxR = Math.max(maxR, cR[k]); });
-      C.ROLES.forEach(function (r) { if (cR[r.id]) pRol.appendChild(hbar(r.emoji + " " + r.id, cR[r.id], maxR)); });
-
-      var pTem = el("div", { class: "panel" }, [el("h3", { text: actual === "todas" ? "🏬 Participación por tienda" : "🗂️ Tarjetas por tema" })]);
-      if (actual === "todas") {
-        var cT = {}, maxT = 0;
-        resp.forEach(function (r) { cT[r.tienda] = (cT[r.tienda] || 0) + 1; });
-        Object.keys(cT).forEach(function (k) { maxT = Math.max(maxT, cT[k]); });
-        Object.keys(C.TIENDAS).forEach(function (id) { pTem.appendChild(hbar(C.TIENDAS[id].emoji + " " + C.TIENDAS[id].nombre, cT[id] || 0, maxT)); });
-      } else {
-        var maxM = 0, cM = {};
-        C.TEMAS.forEach(function (t) { cM[t.id] = tarjetas.filter(function (c) { return c.tema === t.id; }).length; maxM = Math.max(maxM, cM[t.id]); });
-        C.TEMAS.forEach(function (t) { pTem.appendChild(hbar(t.emoji + " " + t.titulo, cM[t.id], maxM, t.color)); });
-      }
-      dash.appendChild(el("div", { class: "panels" }, [pExp, pRol, pTem]));
-
-      dash.appendChild(el("div", { class: "words" }, C.TEMAS.map(function (t) {
-        var top = palabras(tarjetas.filter(function (c) { return c.tema === t.id; }).map(function (c) { return c.texto; }), 8);
+      // fila 2: los tres temas en círculos, con sus palabras
+      box.appendChild(el("div", { class: "res-temas" }, C.TEMAS.map(function (t) {
+        var lista = tarjetas.filter(function (c) { return c.tema === t.id; });
+        var top = palabras(lista.map(function (c) { return c.texto; }), 5);
         var max = top.length ? top[0].n : 1;
-        var cloud = el("div", { class: "cloud" }, top.length ? top.map(function (x) {
-          var size = (0.85 + 0.65 * x.n / max).toFixed(2);
-          return el("span", { style: "font-size:" + size + "vw;background:" + t.color + ";color:" + t.texto, title: x.n + " veces", text: x.w });
-        }) : [el("span", { class: "nodata", text: "Sin palabras aún" })]);
-        return el("div", { class: "panel" }, [el("h3", { text: t.emoji + " Palabras que más se repiten · " + t.titulo }), cloud]);
+        return el("div", { class: "res-tema" }, [
+          el("div", { class: "res-tema-h" }, [
+            el("div", { class: "circ lg", style: "background:" + t.color }, [el("span", { class: "circ-em", text: t.emoji }), el("span", { class: "circ-n", text: String(lista.length) })]),
+            el("b", { text: t.titulo })
+          ]),
+          el("div", { class: "cloud" }, top.length ? top.map(function (x) {
+            return el("span", { style: "font-size:" + (1 + 0.7 * x.n / max).toFixed(2) + "vw;border-color:" + t.color, text: x.w });
+          }) : [el("span", { class: "nada", text: "Aún sin palabras" })])
+        ]);
       })));
 
-      dash.appendChild(el("div", { class: "panel" }, [
-        el("h3", { text: "🆕 Últimas tarjetas" }),
-        el("div", { class: "latest" }, tarjetas.slice(0, 4).map(function (c) {
-          var t = TEMA[c.tema];
-          return el("div", { class: "mini", style: "background:" + t.color + ";color:" + t.texto }, [el("b", { text: t.emoji + " " + t.titulo + " · " + (c.nombre ? c.nombre + " · " : "") + rolEmoji(c.rol) + " " + c.rol }), c.texto]);
-        }))
-      ]));
+      // fila 3: comentarios
+      var coms = resp.filter(function (r) { return r.comentario; }).sort(function (a, b) { return b.ts - a.ts; }).slice(0, 2);
+      if (coms.length) {
+        box.appendChild(el("div", { class: "res-coms" }, [el("h3", { text: "💬 Lo que nos contaron" })].concat(coms.map(function (r) {
+          return el("div", { class: "res-com" }, [r.comentario, el("small", { text: (r.nombre ? r.nombre + " · " : "") + rolEmoji(r.rol) + " " + r.rol })]);
+        }))));
+      }
     }
   }
 
+  // =====================================================================
+  //  MODERACIÓN (en otro computador, con clave)
+  // =====================================================================
+  var CLAVE_KEY = "hito-pbv-clave";
+  function modListar(clave, t) {
+    if (DEMO) return Promise.resolve({ ok: true, respuestas: demoAll().filter(function (r) { return t === "todas" || r.tienda === t; }) });
+    return post({ accion: "moderar", clave: clave, tienda: t });
+  }
+  function modVisible(clave, id, visible) {
+    if (DEMO) {
+      var all = demoAll(); all.forEach(function (r) { if (r.id === id) r.visible = visible; }); demoSave(all);
+      return Promise.resolve({ ok: true });
+    }
+    return post({ accion: "visible", clave: clave, id: id, visible: visible });
+  }
+
+  function vistaModerar() {
+    var clave = sessionStorage.getItem(CLAVE_KEY) || "";
+    var actual = tienda ? tiendaId : "todas";
+    var lista = el("div", { class: "mod-lista" });
+    var estado = el("span", { class: "mod-estado" });
+    var selector = el("div", { class: "mod-sel" }, [["todas", "Todas"]].concat(Object.keys(C.TIENDAS).map(function (id) { return [id, C.TIENDAS[id].emoji + " " + C.TIENDAS[id].nombre]; })).map(function (o) {
+      return el("button", { type: "button", class: o[0] === actual ? "on" : "", text: o[1], onclick: function () { ir("?vista=moderar" + (o[0] === "todas" ? "" : "&tienda=" + o[0])); } });
+    }));
+
+    app.appendChild(el("div", { class: "mod" }, [
+      demoBanner(),
+      el("header", { class: "mod-head" }, [
+        el("div", {}, [el("div", { class: "eyebrow", text: "Plan Buen Vecino 2026 · Hito de cierre" }), el("h1", { text: "🛡️ Moderar respuestas" }),
+          el("p", { class: "hint", text: "Oculta lo que no deba verse en el tendedero ni en el resumen. Se puede volver a mostrar." })]),
+        clioFoot("")
+      ]),
+      el("div", { class: "mod-bar" }, [selector, el("button", { type: "button", class: "mod-btn", text: "🔄 Actualizar", onclick: cargar }), estado]),
+      lista
+    ]));
+
+    function pedirClave(msg) {
+      clear(lista);
+      var inp = el("input", { type: "password", placeholder: "Clave de moderación", autocomplete: "off" });
+      var f = el("form", { class: "mod-clave", onsubmit: function (e) { e.preventDefault(); clave = inp.value.trim(); sessionStorage.setItem(CLAVE_KEY, clave); cargar(); } }, [
+        el("label", { class: "lbl", text: "🔑 Clave de moderación" }), inp, el("button", { type: "submit", class: "mod-btn pri", text: "Entrar" }),
+        msg ? el("p", { class: "err", text: msg }) : null
+      ]);
+      lista.appendChild(f); inp.focus();
+    }
+
+    function cargar() {
+      if (!clave && !DEMO) return pedirClave();
+      estado.textContent = "Cargando…";
+      modListar(clave, actual).then(function (d) {
+        if (!d.ok) { sessionStorage.removeItem(CLAVE_KEY); clave = ""; estado.textContent = ""; return pedirClave(d.error === "clave" ? "Clave incorrecta." : "No se pudo cargar (" + d.error + ")."); }
+        pintar(d.respuestas.sort(function (a, b) { return b.ts - a.ts; }));
+        estado.textContent = d.respuestas.length + " respuestas · " + new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+      }).catch(function () { estado.textContent = "🟠 Sin conexión"; });
+    }
+
+    function pintar(rs) {
+      clear(lista);
+      if (!rs.length) { lista.appendChild(el("p", { class: "hint", text: "Aún no hay respuestas." })); return; }
+      rs.forEach(function (r) {
+        var oculta = String(r.visible).toUpperCase() === "NO";
+        var textos = [];
+        if (r.comentario) textos.push(el("div", { class: "mod-t" }, [el("b", { text: "💬 " }), r.comentario]));
+        C.TEMAS.forEach(function (t) { if (r[t.id]) textos.push(el("div", { class: "mod-t", style: "border-color:" + t.color }, [el("b", { text: t.emoji + " " }), r[t.id]])); });
+        var btn = el("button", { type: "button", class: "mod-btn" + (oculta ? "" : " warn"), text: oculta ? "👁️ Mostrar" : "🙈 Ocultar", onclick: function () {
+          btn.disabled = true;
+          modVisible(clave, r.id, oculta ? "SI" : "NO").then(function (d) { if (!d.ok) throw new Error(d.error); cargar(); })
+            .catch(function () { btn.disabled = false; estado.textContent = "😕 No se pudo cambiar. Intenta de nuevo."; });
+        } });
+        lista.appendChild(el("div", { class: "mod-item" + (oculta ? " oculta" : "") }, [
+          el("div", { class: "mod-meta" }, [
+            el("b", { text: (r.nombre || "🙈 Anónimo") + " · " + rolEmoji(r.rol) + " " + r.rol }),
+            el("span", { text: (C.TIENDAS[r.tienda] ? C.TIENDAS[r.tienda].emoji + " " + C.TIENDAS[r.tienda].nombre + " · " : "") + new Date(r.ts).toLocaleString("es-CO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) + (oculta ? " · OCULTA" : "") })
+          ]),
+          el("div", { class: "mod-textos" }, textos),
+          btn
+        ]));
+      });
+    }
+
+    cargar();
+    setInterval(function () { if (clave || DEMO) cargar(); }, 15000);
+  }
+
   // ---------- arranque ----------
-  if (vista === "tablero" && (tienda || tiendaId === "todas")) vistaTablero();
-  else if (!tienda) vistaInicio();
-  else if (vista === "instrucciones") vistaInstrucciones();
-  else if (vista === "tendedero" || vista === "pantalla") vistaTendedero();
+  if (vista === "moderar") vistaModerar();
+  else if (vista === "relator") vistaRelatorInicio();
+  else if ((vista === "resumen" || vista === "tablero") && (tienda || tiendaId === "todas")) vistaResumen();
+  else if (tienda && vista === "instrucciones") vistaInstrucciones();
+  else if (tienda && (vista === "tendedero" || vista === "pantalla")) vistaTendedero();
+  else if (vista) vistaRelatorInicio();
   else vistaParticipar();
 })();

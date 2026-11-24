@@ -3,17 +3,24 @@
 window.HITO_CONFIG = {
   API_URL: "https://script.google.com/macros/s/AKfycbz9H4Mse2vCQO_Xcseis7P0nsPgppSsFCu5XPOVgnbuLduiGkIcMJkO01U7kYZ9lIW0Kw/exec",
 
-  // Cada cuántos milisegundos se actualizan el tendedero y el tablero.
+  // Cada cuántos milisegundos se actualizan el tendedero y el resumen.
   REFRESH_MS: 6000,
 
   // Largo máximo de cada respuesta.
   MAX_CHARS: 160,
 
-  // Minutos del reloj de cuenta regresiva en el proyector.
-  TIEMPO_MIN: 3,
-
   // Tarjetas visibles por cuerda en el tendedero (las más recientes).
   MAX_TARJETAS_POR_TEMA: 12,
+
+  // Momentos de la actividad, cada uno con su propio tiempo en el reloj del relator.
+  // "tema" enlaza el momento con una cuerda del tendedero (se destaca mientras corre).
+  // Los minutos son una propuesta: ajústalos según la agenda del hito.
+  MOMENTOS: [
+    { id: "responder", emoji: "📱", titulo: "Responder en el celular", min: 4 },
+    { id: "logro", emoji: "🏆", titulo: "Conversemos: Logros 2026", min: 5, tema: "logro" },
+    { id: "mejora", emoji: "🔧", titulo: "Conversemos: Retos y mejoras", min: 5, tema: "mejora" },
+    { id: "sueno", emoji: "🌱", titulo: "Conversemos: 2027", min: 5, tema: "sueno" }
+  ],
 
   TIENDAS: {
     envigado: { nombre: "Envigado", emoji: "🌸" },
@@ -23,21 +30,21 @@ window.HITO_CONFIG = {
 
   TEMAS: [
     {
-      id: "logro", num: 1, emoji: "🏆", titulo: "Logros 2026", sub: "Lo que pasó",
+      id: "logro", num: 1, emoji: "🏆", titulo: "Logros 2026", corto: "Logros",
       pregunta: "¿Qué logramos juntos en 2026?",
-      ayuda: "Piensa en un momento, un resultado o algo que te dio orgullo.",
+      ayuda: "Un momento, un resultado o algo que te dio orgullo.",
       ejemplos: ["Ver a los niños felices en la actividad", "Vender en la feria y conseguir nuevos clientes", "Conocer a la comunidad del barrio"],
       color: "#0058A3", texto: "#FFFFFF"
     },
     {
-      id: "mejora", num: 2, emoji: "🔧", titulo: "Retos y oportunidades de mejora", sub: "Lo que nos costó",
+      id: "mejora", num: 2, emoji: "🔧", titulo: "Retos y oportunidades de mejora", corto: "Retos",
       pregunta: "¿Qué retos tuvimos y qué podemos mejorar?",
-      ayuda: "Algo que casi no pasa o que podríamos hacer distinto.",
+      ayuda: "Algo que costó o que podríamos hacer distinto.",
       ejemplos: ["Avisar las fechas con más tiempo", "Una mejor ubicación para la feria", "Que más coworkers puedan participar"],
       color: "#FFDB00", texto: "#111111"
     },
     {
-      id: "sueno", num: 3, emoji: "🌱", titulo: "Así nos proyectamos 2027", sub: "Lo que queremos que pase",
+      id: "sueno", num: 3, emoji: "🌱", titulo: "Así nos proyectamos 2027", corto: "2027",
       pregunta: "¿Qué queremos que pase en 2027?",
       ayuda: "Lo que sueñas para el próximo año del Plan Buen Vecino.",
       ejemplos: ["Llegar a más barrios", "Una feria en cada temporada", "Que las fundaciones propongan actividades"],
@@ -45,12 +52,12 @@ window.HITO_CONFIG = {
     }
   ],
 
+  // El equipo CliO no participa como rol.
   ROLES: [
     { id: "Voluntario/a IKEA", emoji: "🙋" },
     { id: "Emprendedor/a", emoji: "🛍️" },
     { id: "Fundación o aliado", emoji: "🤝" },
-    { id: "Equipo IKEA", emoji: "💙" },
-    { id: "Equipo CliO", emoji: "📊" },
+    { id: "IKEA Colombia", emoji: "💙" },
     { id: "Otro", emoji: "✨" }
   ],
 
