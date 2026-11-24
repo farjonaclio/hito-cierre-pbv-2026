@@ -9,6 +9,9 @@ window.HITO_CONFIG = {
   // Largo máximo de cada respuesta.
   MAX_CHARS: 160,
 
+  // Minutos del reloj de cuenta regresiva en el proyector.
+  TIEMPO_MIN: 3,
+
   // Tarjetas visibles por cuerda en el tendedero (las más recientes).
   MAX_TARJETAS_POR_TEMA: 12,
 
@@ -27,14 +30,14 @@ window.HITO_CONFIG = {
       color: "#0058A3", texto: "#FFFFFF"
     },
     {
-      id: "mejora", num: 2, emoji: "🔧", titulo: "Lo que nos costó", sub: "Oportunidades de mejora",
-      pregunta: "¿Qué nos costó o qué podemos hacer mejor?",
+      id: "mejora", num: 2, emoji: "🔧", titulo: "Retos y oportunidades de mejora", sub: "Lo que nos costó",
+      pregunta: "¿Qué retos tuvimos y qué podemos mejorar?",
       ayuda: "Algo que casi no pasa o que podríamos hacer distinto.",
       ejemplos: ["Avisar las fechas con más tiempo", "Una mejor ubicación para la feria", "Que más coworkers puedan participar"],
       color: "#FFDB00", texto: "#111111"
     },
     {
-      id: "sueno", num: 3, emoji: "🌱", titulo: "Sueños 2027", sub: "Lo que queremos que pase",
+      id: "sueno", num: 3, emoji: "🌱", titulo: "Así nos proyectamos 2027", sub: "Lo que queremos que pase",
       pregunta: "¿Qué queremos que pase en 2027?",
       ayuda: "Lo que sueñas para el próximo año del Plan Buen Vecino.",
       ejemplos: ["Llegar a más barrios", "Una feria en cada temporada", "Que las fundaciones propongan actividades"],
@@ -61,5 +64,5 @@ window.HITO_CONFIG = {
 
   // Texto de autorización para quienes ponen su nombre. Validar con el área legal antes de usar.
   AUTORIZACION:
-    "Autorizo el uso de mi nombre para mostrarlo junto a mis respuestas en la actividad del hito de cierre del Plan Buen Vecino y en su registro, conforme a la Ley 1581 de 2012. Puedo pedir que se retire en cualquier momento."
+    "Autorizo mostrar mi nombre en esta actividad y en su registro (Ley 1581 de 2012)."
 };

@@ -193,3 +193,37 @@ textarea { min-height: 130px; resize: vertical; }
   .ins { grid-template-columns: 1fr; } .ins-step b { font-size: 16px; } .ins-step span, .ins-url, .ins-time, .ins-tema { font-size: 13px; }
   .ins-n, .ins-em, .ins-tema span { font-size: 22px; width: auto; min-width: 0; } .bigqr { width: 240px; height: 240px; }
 }
+
+/* v2: tiendas, tema, reloj, avisos */
+.chips.three { grid-template-columns: 1fr 1fr 1fr; }
+.chips.three .chip { flex-direction: column; text-align: center; gap: 4px; padding: 10px 6px; }
+.tema-line { height: 8px; border-radius: 4px; }
+.howto .row { padding: 14px; }
+.headrow { display: flex; gap: 1vw; align-items: stretch; margin-right: 3vw; }
+.headrow .qr { margin-right: 0; }
+.reloj { background: var(--fondo); border-radius: 12px; padding: 1vh 1.2vw; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6vh; transition: background .3s; }
+.reloj .rl-top { display: flex; align-items: center; gap: .6vw; font-size: 1.6vw; }
+.reloj .rl-cifra { font-size: 2.6vw; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--azul); }
+.reloj .rl-btns { display: flex; gap: .4vw; }
+.reloj .rl-btns button { border: 0; background: var(--blanco); color: var(--azul); border-radius: 999px; padding: .4vh .8vw; font-size: .8vw; font-weight: 700; cursor: pointer; }
+.reloj.corre { background: #EAF2FB; }
+.reloj.urgente { background: var(--amarillo); animation: latido 1s ease-in-out infinite; }
+.reloj.urgente .rl-cifra { color: var(--tinta); }
+.reloj.fin { background: #FDE2E1; }
+.reloj.fin .rl-cifra { color: #B42318; }
+@keyframes latido { 50% { transform: scale(1.04); } }
+.reloj.grande { padding: 2vh 2vw; width: 34vh; }
+.reloj.grande .rl-top { font-size: 2.6vw; }
+.reloj.grande .rl-cifra { font-size: 5vw; }
+.reloj.grande .rl-btns button { font-size: 1vw; padding: .6vh 1vw; }
+.ins-step b { font-size: 1.8vw; }
+.toast { position: fixed; left: 50%; bottom: 8vh; transform: translateX(-50%); background: var(--azul); color: var(--blanco); font-weight: 800; font-size: 1.6vw; padding: 1.4vh 2vw; border-radius: 999px; box-shadow: 0 10px 30px rgba(0,0,0,.2); animation: sube .4s ease-out both; z-index: 10; }
+.toast.out { opacity: 0; transition: opacity .5s; }
+@keyframes sube { from { opacity: 0; transform: translate(-50%, 3vh); } }
+@media (max-width: 900px) {
+  .headrow { flex-direction: column; } .reloj .rl-cifra { font-size: 28px; } .reloj .rl-top { font-size: 20px; } .reloj .rl-btns button { font-size: 12px; padding: 4px 10px; }
+  .reloj.grande { width: 240px; } .reloj.grande .rl-cifra { font-size: 44px; } .toast { font-size: 15px; } .ins-step b { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .reloj.urgente { animation: none; } .toast { animation: none; } }
+.col-head h2 { font-size: 1.35vw; }
+.col-head .k { white-space: nowrap; }

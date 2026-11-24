@@ -103,7 +103,7 @@
 
   // ---------- participación desde el celular ----------
   function vistaParticipar() {
-    var s = { paso: 0, rol: "", nombre: "", anonimo: false, autorizacion: false, experiencia: 0, logro: "", mejora: "", sueno: "" };
+    var s = { paso: 0, tienda: tiendaId, rol: "", nombre: "", anonimo: false, autorizacion: false, experiencia: 0, logro: "", mejora: "", sueno: "" };
     var PASOS = ["inicio", "quien", "experiencia"].concat(C.TEMAS.map(function (t) { return t.id; })).concat(["revisar"]);
 
     function shell(tabTxt, eyebrow, titulo, body, actions) {
@@ -113,7 +113,7 @@
       app.appendChild(el("div", { class: "phone" }, [
         demoBanner(),
         el("div", { class: "p-head" }, [
-          el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV · " + tienda.emoji + " " + tienda.nombre]),
+          el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV · " + C.TIENDAS[s.tienda].emoji + " " + C.TIENDAS[s.tienda].nombre]),
           el("div", { class: "tab", text: tabTxt })
         ]),
         s.paso > 0 ? bar : null,
@@ -141,13 +141,12 @@
       var howto = el("div", { class: "howto" }, C.TEMAS.map(function (t) {
         return el("div", { class: "row", style: "border-left:6px solid " + t.color }, [
           el("div", { class: "em", text: t.emoji }),
-          el("div", {}, [el("b", { text: t.num + ". " + t.titulo }), el("span", { text: t.pregunta })])
+          el("b", { text: t.num + ". " + t.titulo })
         ]);
       }));
       shell("Bienvenida", "Hito de cierre 2026 💙", "Hagamos que siga pasando", [
-        el("p", { text: "Vamos a recorrer juntos el año en tres pasos. Tus respuestas se cuelgan en el tendedero que verás en la pantalla." }),
         howto,
-        el("div", { class: "badge", text: "⏱️ Te toma unos 3 minutos" })
+        el("div", { class: "badge", text: "⏱️ " + C.TIEMPO_MIN + " minutos · ¡mira el reloj en pantalla!" })
       ], [el("button", { class: "btn pri", type: "button", text: "Empezar 👉", onclick: function () { ir(1); } })]);
     }
 
@@ -156,6 +155,10 @@
       var chips = el("div", { class: "chips", role: "radiogroup", "aria-label": "¿Cómo participaste?" }, C.ROLES.map(function (r) {
         return el("button", { type: "button", class: "chip" + (s.rol === r.id ? " on" : ""), role: "radio", "aria-checked": String(s.rol === r.id), onclick: function () { s.rol = r.id; render(); } },
           [el("span", { class: "em", text: r.emoji }), r.id]);
+      }));
+      var tiendas = el("div", { class: "chips three", role: "radiogroup", "aria-label": "Tu tienda" }, Object.keys(C.TIENDAS).map(function (id) {
+        return el("button", { type: "button", class: "chip" + (s.tienda === id ? " on" : ""), role: "radio", "aria-checked": String(s.tienda === id), onclick: function () { s.tienda = id; render(); } },
+          [el("span", { class: "em", text: C.TIENDAS[id].emoji }), C.TIENDAS[id].nombre]);
       }));
       var nombre = el("input", { type: "text", id: "nombre", maxlength: "60", autocomplete: "name", placeholder: "Escribe tu nombre (opcional)" });
       nombre.value = s.nombre;
@@ -169,19 +172,19 @@
       }
       nombre.addEventListener("input", sync); anon.addEventListener("change", sync); aut.addEventListener("change", sync);
       sync();
-      shell(pasoTxt(), "Paso 1 · Cuéntanos quién eres", "¿Cómo participaste este año?", [
-        chips,
+      shell(pasoTxt(), "Paso 1 · ¿Quién eres?", "Cuéntanos de ti 👋", [
+        el("label", { class: "lbl", text: "🏬 Tu tienda" }), tiendas,
+        el("label", { class: "lbl", text: "🙋 ¿Cómo participaste?" }), chips,
         el("div", {}, [el("label", { class: "lbl", for: "nombre", text: "✍️ Tu nombre" }), nombre]),
         el("label", { class: "check", for: "anon" }, [anon, el("span", { text: "🙈 Prefiero participar de forma anónima" })]),
         autBox,
-        el("p", { class: "legal", text: "Si participas de forma anónima, o no autorizas el uso de tu nombre, en la pantalla solo se verá tu rol." }),
         err
       ], [
         el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(0); } }),
         el("button", { class: "btn pri", type: "button", text: "Siguiente 👉", onclick: function () {
           sync();
           if (!s.rol) return error(err, "👆 Elige cómo participaste.");
-          if (s.nombre && !s.anonimo && !s.autorizacion) return error(err, "Para mostrar tu nombre necesitamos tu autorización. Si prefieres, marca la opción anónima 🙈.");
+          if (s.nombre && !s.anonimo && !s.autorizacion) return error(err, "Autoriza tu nombre o marca 🙈 anónimo.");
           ir(2);
         } })
       ]);
@@ -192,8 +195,7 @@
         return el("button", { type: "button", class: s.experiencia === e.v ? "on" : "", role: "radio", "aria-checked": String(s.experiencia === e.v), "aria-label": e.txt, onclick: function () { s.experiencia = e.v; render(); } },
           [el("span", { class: "em", text: e.emoji }), el("small", { text: e.txt })]);
       }));
-      shell(pasoTxt(), "Paso 2 · Calentemos motores 🔥", "¿Cómo fue tu experiencia en el Plan Buen Vecino 2026?", [
-        el("p", { class: "hint", text: "Toca la carita que mejor te representa." }),
+      shell(pasoTxt(), "Paso 2 · Calentemos motores 🔥", "¿Cómo te fue en el PBV 2026?", [
         scale
       ], [
         el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(1); } }),
@@ -210,11 +212,10 @@
       var ej = el("div", { class: "ejemplos" }, t.ejemplos.map(function (x) {
         return el("button", { type: "button", text: "💡 " + x, onclick: function () { ta.value = x; upd(); ta.focus(); } });
       }));
-      shell(pasoTxt(), "Paso " + (s.paso) + " · " + t.sub, t.emoji + " " + t.titulo, [
-        el("div", { class: "tema-head", style: "border-color:" + t.color }, [el("div", {}, [el("h2", { text: t.pregunta }), el("div", { class: "s", text: t.ayuda })])]),
-        el("div", {}, [el("label", { class: "lbl", for: "txt", text: "Tu respuesta" }), ta, count]),
-        el("div", {}, [el("p", { class: "hint", text: "¿Sin ideas? Toca un ejemplo y ajústalo a tu manera:" }), ej]),
-        el("p", { class: "legal", text: "Puedes dejarlo en blanco y seguir. Evita escribir datos personales de otras personas." })
+      shell(pasoTxt(), t.emoji + " " + t.titulo, t.pregunta, [
+        el("div", { class: "tema-line", style: "background:" + t.color }),
+        el("div", {}, [ta, count]),
+        ej
       ], [
         el("button", { class: "btn sec", type: "button", text: "Atrás", onclick: function () { ir(s.paso - 1); } }),
         el("button", { class: "btn pri", type: "button", text: "Siguiente 👉", onclick: function () { ir(s.paso + 1); } })
@@ -237,7 +238,7 @@
         if (!alguna) return error(err, "✍️ Escribe al menos una respuesta antes de enviar.");
         send.disabled = true; back.disabled = true; send.textContent = "Enviando…";
         var conNombre = !s.anonimo && !!s.nombre && s.autorizacion;
-        var payload = { tienda: tiendaId, rol: s.rol, nombre: conNombre ? s.nombre : "", anonimo: !conNombre, autorizacion: conNombre, experiencia: s.experiencia || null };
+        var payload = { tienda: s.tienda, rol: s.rol, nombre: conNombre ? s.nombre : "", anonimo: !conNombre, autorizacion: conNombre, experiencia: s.experiencia || null };
         C.TEMAS.forEach(function (t) { payload[t.id] = s[t.id].trim(); });
         enviar(payload).then(function (r) {
           if (!r || !r.ok) throw new Error((r && r.error) || "error");
@@ -247,7 +248,7 @@
           send.disabled = false; back.disabled = false; send.textContent = "Colgar en el tendedero 🚀";
         });
       } });
-      shell(pasoTxt(), "Último paso · Revisa antes de enviar 👀", "Así se verán tus tarjetas", [
+      shell(pasoTxt(), "Último paso 👀", "Así se verán tus tarjetas", [
         el("p", { class: "hint", text: quienTxt + (exp ? " · Experiencia " + exp.emoji : "") }),
         prev, err
       ], [back, send]);
@@ -256,7 +257,7 @@
     function gracias() {
       clear(app);
       app.appendChild(el("div", { class: "phone" }, [
-        el("div", { class: "p-head" }, [el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV · " + tienda.emoji + " " + tienda.nombre]), el("div", { class: "tab", text: "¡Listo!" })]),
+        el("div", { class: "p-head" }, [el("div", { class: "who" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "PBV · " + C.TIENDAS[s.tienda].emoji + " " + C.TIENDAS[s.tienda].nombre]), el("div", { class: "tab", text: "¡Listo!" })]),
         el("div", { class: "p-body thanks" }, [
           el("div", { class: "em", text: "🎉" }),
           el("div", { class: "big", text: "¡Gracias! Tus tarjetas ya están en el tendedero." }),
@@ -271,7 +272,7 @@
   }
 
   // ---------- marco de pantallas grandes ----------
-  function pantalla(tabTxt, sub, contenido, conQR, extraTools) {
+  function pantalla(tabTxt, sub, contenido, conQR, extraTools, extraHead) {
     var qr = null;
     if (conQR && tienda) {
       var code = el("div", { class: "code", "aria-label": "Código QR para participar" });
@@ -290,9 +291,9 @@
         el("div", {}, [
           el("div", { class: "eyebrow" }, [el("img", { src: "pbv-sello.png", alt: "Plan Buen Vecino IKEA" }), "Plan Buen Vecino 2026 · " + nombreT]),
           el("h1", { text: "Hagamos que siga pasando" }),
-          el("div", { class: "sub", text: sub })
+          sub ? el("div", { class: "sub", text: sub }) : null
         ]),
-        el("div", { class: "right" }, [el("div", { class: "tab", text: tabTxt }), qr])
+        el("div", { class: "right" }, [el("div", { class: "tab", text: tabTxt }), el("div", { class: "headrow" }, [extraHead || null, qr])])
       ]),
       contenido,
       el("footer", { class: "s-foot" }, [clioFoot(), el("div", { class: "tools" }, (extraTools || []).concat([estado, full]))])
@@ -309,6 +310,53 @@
     ciclo();
   }
 
+  // ---------- reloj de cuenta regresiva (proyector) ----------
+  var RELOJ_KEY = "hito-pbv-reloj";
+  function relojEstado() {
+    try { var r = JSON.parse(localStorage.getItem(RELOJ_KEY)); if (r && typeof r.restante === "number") return r; } catch (e) {}
+    return { restante: C.TIEMPO_MIN * 60000, fin: null };
+  }
+  function relojGuardar(r) { try { localStorage.setItem(RELOJ_KEY, JSON.stringify(r)); } catch (e) {} }
+  function reloj(grande) {
+    var r = relojEstado();
+    var cifra = el("div", { class: "rl-cifra" });
+    var play = el("button", { type: "button" });
+    var box = el("div", { class: "reloj" + (grande ? " grande" : "") }, [
+      el("div", { class: "rl-top" }, [el("span", { text: "⏱️" }), cifra]),
+      el("div", { class: "rl-btns" }, [
+        play,
+        el("button", { type: "button", text: "+1 min", onclick: function () { if (r.fin) r.fin += 60000; else r.restante += 60000; relojGuardar(r); pintar(); } }),
+        el("button", { type: "button", text: "↺", "aria-label": "Reiniciar", onclick: function () { r = { restante: C.TIEMPO_MIN * 60000, fin: null }; relojGuardar(r); pintar(); } })
+      ])
+    ]);
+    play.addEventListener("click", function () {
+      if (r.fin) { r.restante = Math.max(0, r.fin - Date.now()); r.fin = null; }
+      else { if (r.restante <= 0) r.restante = C.TIEMPO_MIN * 60000; r.fin = Date.now() + r.restante; }
+      relojGuardar(r); pintar();
+    });
+    function pintar() {
+      var ms = r.fin ? Math.max(0, r.fin - Date.now()) : r.restante;
+      var seg = Math.ceil(ms / 1000);
+      cifra.textContent = ms <= 0 ? "¡Tiempo! ⏰" : String(Math.floor(seg / 60)).padStart(2, "0") + ":" + String(seg % 60).padStart(2, "0");
+      box.classList.toggle("corre", !!r.fin && ms > 0);
+      box.classList.toggle("urgente", !!r.fin && ms > 0 && ms <= 30000);
+      box.classList.toggle("fin", ms <= 0);
+      play.textContent = r.fin && ms > 0 ? "⏸ Pausar" : "▶ Iniciar";
+      if (r.fin && ms <= 0) { r = { restante: 0, fin: null }; relojGuardar(r); }
+    }
+    pintar();
+    setInterval(pintar, 250);
+    return box;
+  }
+
+  // ---------- aviso de tarjeta nueva (proyector) ----------
+  function aviso(texto) {
+    var t = el("div", { class: "toast", text: texto });
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add("out"); }, 3200);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 3800);
+  }
+
   // ---------- instrucciones (proyector, antes de los resultados) ----------
   function vistaInstrucciones() {
     var link = url("?tienda=" + tiendaId);
@@ -316,17 +364,17 @@
     try { var q = window.qrcode(0, "M"); q.addData(link); q.make(); code.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
     catch (e) { code.textContent = "QR"; }
     var pasos = [
-      ["📱", "Escanea el código QR", "Usa la cámara de tu celular."],
-      ["🙋", "Cuéntanos quién eres", "Tu nombre es opcional: puedes participar de forma anónima 🙈."],
-      ["😊", "Califica tu 2026", "Toca la carita que mejor te representa."],
-      ["🏆🔧🌱", "Responde 3 preguntas", "Logros 2026, lo que nos costó y tus sueños 2027."],
-      ["🧺", "Cuelga tus tarjetas", "Tus respuestas aparecen en el tendedero de esta pantalla."]
+      ["📱", "Escanea el QR"],
+      ["🙋", "Elige tu tienda y tu rol"],
+      ["😊", "Califica tu 2026"],
+      ["🏆🔧🌱", "Responde 3 preguntas"],
+      ["🧺", "¡Cuelga tus tarjetas!"]
     ];
     var lista = el("div", { class: "ins-steps" }, pasos.map(function (p, i) {
       return el("div", { class: "ins-step" }, [
         el("div", { class: "ins-n", text: String(i + 1) }),
         el("div", { class: "ins-em", text: p[0] }),
-        el("div", {}, [el("b", { text: p[1] }), el("span", { text: p[2] })])
+        el("b", { text: p[1] })
       ]);
     }));
     var temas = el("div", { class: "ins-temas" }, C.TEMAS.map(function (t) {
@@ -334,10 +382,10 @@
     }));
     var contenido = el("div", { class: "ins" }, [
       el("div", { class: "ins-left" }, [lista, temas]),
-      el("div", { class: "ins-right" }, [code, el("p", { class: "ins-url", text: link.replace(/^https?:\/\//, "") }), el("p", { class: "ins-time", text: "⏱️ Toma unos 3 minutos" })])
+      el("div", { class: "ins-right" }, [code, reloj(true)])
     ]);
     var ir = el("button", { type: "button", text: "🧺 Ver tendedero 👉", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=tendedero"; } });
-    var estado = pantalla("📋 ¿Cómo participar?", "Así vamos a recorrer juntos el año", contenido, false, [ir]);
+    var estado = pantalla("📋 ¿Cómo participar?", "", contenido, false, [ir]);
     estado.textContent = "";
   }
 
@@ -357,7 +405,7 @@
     });
     var instr = el("button", { type: "button", text: "📋 Instrucciones", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=instrucciones"; } });
     var tablero = el("button", { type: "button", text: "📊 Ver tablero", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=tablero"; } });
-    var estado = pantalla("🧺 Tendedero en vivo", "🏆 Logros 2026 · 🔧 Lo que nos costó · 🌱 Sueños 2027", lines, true, [instr, tablero]);
+    var estado = pantalla("🧺 Tendedero en vivo", "", lines, true, [instr, tablero], reloj(false));
 
     bucle(function () {
       return traer(tiendaId).then(function (resp) {
@@ -367,7 +415,7 @@
           var box = cols[t.id];
           box.k.textContent = lista.length + " 🗂️";
           clear(box.cards);
-          if (!lista.length) { box.cards.appendChild(el("p", { class: "empty", text: "Aún no hay tarjetas. ¡Escanea el QR y cuelga la primera! 📱" })); return; }
+          if (!lista.length) { box.cards.appendChild(el("p", { class: "empty", text: "📱 ¡Cuelga la primera!" })); return; }
           lista.slice(0, C.MAX_TARJETAS_POR_TEMA).forEach(function (c) {
             var by = (c.nombre ? c.nombre + " · " : "") + rolEmoji(c.rol) + " " + (c.rol || "Participante");
             box.cards.appendChild(el("div", { class: "card" + (!primera && !vistos[c.id] ? " nueva" : ""), style: "background:" + t.color + ";color:" + t.texto }, [
@@ -375,6 +423,11 @@
             ]));
           });
         });
+        if (!primera) {
+          var nuevas = resp.filter(function (r) { return !vistos[r.id + "-v"]; });
+          nuevas.slice(0, 3).forEach(function (r, i) { setTimeout(function () { aviso("🎉 ¡Nuevas tarjetas! " + rolEmoji(r.rol) + " " + (r.nombre || r.rol)); }, i * 900); });
+        }
+        resp.forEach(function (r) { vistos[r.id + "-v"] = true; });
         tarjetas.forEach(function (c) { vistos[c.id] = true; });
         primera = false;
       });
@@ -412,7 +465,7 @@
     });
     var tools = [selector];
     if (tienda) tools.push(el("button", { type: "button", text: "🧺 Ver tendedero", onclick: function () { location.search = "?tienda=" + tiendaId + "&vista=tendedero"; } }));
-    var estado = pantalla("📊 Tablero en vivo", "Resultados de la actividad, en tiempo real", dash, !!tienda, tools);
+    var estado = pantalla("📊 Tablero en vivo", "", dash, !!tienda, tools);
 
     bucle(function () {
       return traer(actual).then(function (resp) { pintar(resp); });
